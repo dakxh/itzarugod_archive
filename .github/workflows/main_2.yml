@@ -1,4 +1,4 @@
-name: YT Stream to MEGA Archiver
+name: YT Stream to Hugging Face Archiver
 
 on:
   workflow_dispatch: # Pure manual trigger, no inputs needed
@@ -17,19 +17,15 @@ jobs:
   archive-stream:
     runs-on: ubuntu-22.04
     steps:
-      - name: Install Dependencies (yt-dlp, Deno, ffmpeg, MEGAcmd & WARP)
+      - name: Install Dependencies (yt-dlp, Deno, ffmpeg, HF Hub & WARP)
         run: |
           sudo apt-get update
           sudo apt-get install -y python3-pip unzip curl ffmpeg gnupg
           
-          # Install yt-dlp & Deno
-          pip3 install -U yt-dlp
+          # Install yt-dlp, Deno & Hugging Face CLI
+          pip3 install -U yt-dlp "huggingface_hub[cli]"
           curl -fsSL https://deno.land/install.sh | sh
           echo "$HOME/.deno/bin" >> $GITHUB_PATH
-          
-          # Install MEGAcmd
-          wget https://mega.nz/linux/repo/xUbuntu_22.04/amd64/megacmd-xUbuntu_22.04_amd64.deb
-          sudo apt install -y "$PWD/megacmd-xUbuntu_22.04_amd64.deb"
           
           # Install Cloudflare WARP repository and client
           curl -fsSL https://pkg.cloudflareclient.com/pubkey.gpg | sudo gpg --yes --dearmor --output /usr/share/keyrings/cloudflare-warp-archive-keyring.gpg
@@ -148,26 +144,40 @@ jobs:
             fi
           done
 
-      - name: Upload to MEGA
+      - name: Sync Archive to Hugging Face Bucket
         env:
-          MEGA_EMAIL: ${{ secrets.MEGA_EMAIL }}
-          MEGA_PASSWORD: ${{ secrets.MEGA_PASSWORD }}
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_TARGET_BUCKET: ${{ secrets.HF_TARGET_BUCKET }}
         run: |
           # Forced to Indian Standard Time to prevent midnight folder misnaming
           FOLDER_DATE=$(TZ='Asia/Kolkata' date +'%-d %B %Y')
+          STAGING_DIR="hf_upload/archives/${STREAMER_NAME}_${FOLDER_DATE}"
           
           if ls ${STREAMER_NAME}_${FILE_PREFIX}_* 1> /dev/null 2>&1; then
-            echo "Archive found. Authenticating with MEGA..."
-            mega-login "$MEGA_EMAIL" "$MEGA_PASSWORD"
+            echo "Archive found. Preparing local staging directory..."
+            mkdir -p "$STAGING_DIR"
             
-            echo "Creating daily folder inside /archives..."
-            mega-mkdir "/archives/${STREAMER_NAME}_$FOLDER_DATE" || true
+            # Move all downloaded video parts into the staging folder
+            mv ${STREAMER_NAME}_${FILE_PREFIX}_* "$STAGING_DIR/"
             
-            echo "Uploading files to /archives/${STREAMER_NAME}_$FOLDER_DATE/ ..."
-            mega-put ${STREAMER_NAME}_${FILE_PREFIX}_* "/archives/${STREAMER_NAME}_$FOLDER_DATE/"
+            echo "Syncing to Hugging Face Storage Bucket..."
+            python3 -c "
+          import os
+          from huggingface_hub import login, sync_bucket
+          token = os.environ.get('HF_TOKEN')
+          bucket = os.environ.get('HF_TARGET_BUCKET')
+          
+          print('🚀 Authenticating Hugging Face SDK...')
+          login(token=token)
+          
+          print(f'⚡ Initiating ultra-fast Storage Bucket sync to {bucket}...')
+          sync_bucket('./hf_upload', f'hf://buckets/{bucket}')
+          "
             
-            mega-logout
-            echo "Upload successfully completed!"
+            echo "✅ Hugging Face Sync completed successfully!"
+            
+            echo "🧹 Cleaning up local staging files..."
+            rm -rf hf_upload
           else
             echo "No stream found."
           fi
