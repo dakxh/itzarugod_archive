@@ -7,8 +7,8 @@ on:
 # ⚙️ SCRIPT CONFIGURATION (EDIT THIS ONLY)
 # ==========================================
 env:
-  STREAMER_NAME: "itzarugod"
-  TARGET_URL: "https://www.youtube.com/@itzarugod/live"
+  STREAMER_NAME: "artemis"
+  TARGET_URL: "https://www.youtube.com/watch?v=z-j1uxBmis0"
   FILE_PREFIX: "1" # Use 2 for the second runner
   DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
 # ==========================================
