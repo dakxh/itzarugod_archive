@@ -86,7 +86,7 @@ jobs:
         run: |
           # Calculate timestamps for dynamic timeout
           START_TIME=$(date +%s)
-          MAX_DURATION=$((310 * 60)) # 340 minutes in seconds
+          MAX_DURATION=$((340 * 60)) # 340 minutes in seconds
           
           while true; do
             CURRENT_TIME=$(date +%s)
